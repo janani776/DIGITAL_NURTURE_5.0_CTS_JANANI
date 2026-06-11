@@ -1,0 +1,149 @@
+/*====================================================
+  HANDS-ON 4
+  QUERY OPTIMISATION — INDEXES, EXPLAIN & N+1 PROBLEM
+====================================================*/
+
+/*====================================================
+  TASK 1 : BASELINE PERFORMANCE — NO INDEXES
+====================================================*/
+
+-- Step 48
+
+explain format=json
+select s.first_name,
+       s.last_name,
+       c.course_name
+from enrollments e
+join students s
+on s.student_id = e.student_id
+join courses c
+on c.course_id = e.course_id
+where s.enrollment_year = 2022;
+
+-- Step 49
+-- Identify Full Table Scan from EXPLAIN output.
+
+-- Step 50
+-- Note rows examined from EXPLAIN output.
+
+/*
+Expected Outcome:
+
+1. EXPLAIN output generated.
+2. Full Table Scan identified.
+3. Rows examined documented.
+*/
+
+
+/*====================================================
+  TASK 2 : ADD INDEXES AND COMPARE PLANS
+====================================================*/
+
+-- Step 51
+
+create index idx_students_enrollment_year
+on students(enrollment_year);
+
+-- Step 52
+
+create unique index idx_enrollments_student_course
+on enrollments(student_id, course_id);
+
+-- Step 53
+
+create index idx_courses_course_code
+on courses(course_code);
+
+-- Step 54
+
+explain format=json
+select s.first_name,
+       s.last_name,
+       c.course_name
+from enrollments e
+join students s
+on s.student_id = e.student_id
+join courses c
+on c.course_id = e.course_id
+where s.enrollment_year = 2022;
+
+-- Step 55
+
+-- MySQL does not support PostgreSQL-style partial indexes.
+-- Therefore this step is documented only.
+
+/*
+Expected Outcome:
+
+1. Indexes created successfully.
+2. Query plan compared before and after indexing.
+3. Index usage observed.
+4. Composite UNIQUE index prevents duplicate enrollments.
+*/
+
+
+/*====================================================
+  TASK 3 : IDENTIFY AND FIX THE N+1 PROBLEM
+====================================================*/
+
+/*
+Python Version 1 - N+1 Problem
+
+1 Query:
+select * from enrollments
+
+Then one query per enrollment:
+
+select first_name,last_name
+from students
+where student_id=?
+
+Total Queries = N + 1
+
+Expected:
+13 queries executed
+*/
+
+
+/*
+Python Version 2 - Optimized JOIN
+
+select e.enrollment_id,
+       s.first_name,
+       s.last_name,
+       e.grade
+from enrollments e
+join students s
+on e.student_id = s.student_id;
+
+Total Queries = 1
+
+Expected:
+1 query executed
+*/
+
+
+/*
+Analysis:
+
+For 10,000 enrollments
+
+N+1 Approach:
+10001 queries
+
+JOIN Approach:
+1 query
+
+Extra Queries:
+10000
+*/
+
+
+/*
+Expected Outcome:
+
+1. N+1 problem identified.
+2. JOIN solution implemented.
+3. Query count reduced from 13 to 1.
+4. Performance improvement documented.
+*/

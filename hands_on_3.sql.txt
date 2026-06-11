@@ -1,0 +1,341 @@
+/*====================================================
+  HANDS-ON 3
+  TASK 1 : SUBQUERIES
+====================================================*/
+
+-- Step 35
+-- Students enrolled in more courses than the average number of enrollments
+
+select s.student_id,
+       concat(s.first_name,' ',s.last_name) as student_name,
+       count(e.course_id) as total_courses
+from students s
+join enrollments e
+on s.student_id=e.student_id
+group by s.student_id,s.first_name,s.last_name
+having count(e.course_id) >
+(
+    select avg(course_count)
+    from
+    (
+        select count(*) as course_count
+        from enrollments
+        group by student_id
+    ) avg_table
+);
+
+-- Step 36
+-- Courses where all enrolled students received grade A
+
+select c.course_name
+from courses c
+where not exists
+(
+    select *
+    from enrollments e
+    where e.course_id=c.course_id
+    and e.grade<>'A'
+);
+
+-- Step 37
+-- Highest paid professor in each department
+
+select p.prof_name,
+       p.salary,
+       d.dept_name
+from professors p
+join departments d
+on p.department_id=d.department_id
+where p.salary=
+(
+    select max(p2.salary)
+    from professors p2
+    where p2.department_id=p.department_id
+);
+
+-- Step 38
+-- Departments with average salary above 85000
+
+select dept_name,
+       avg_salary
+from
+(
+    select d.dept_name,
+           avg(p.salary) as avg_salary
+    from departments d
+    join professors p
+    on d.department_id=p.department_id
+    group by d.department_id,d.dept_name
+) dept_avg
+where avg_salary>85000;
+
+/*
+Expected Outcome:
+
+1. Students enrolled in more courses than the average are displayed.
+2. Courses where all students received grade A are displayed.
+3. Highest paid professor from each department is displayed.
+4. Departments with average professor salary above 85000 are displayed.
+*/
+
+
+/*====================================================
+  TASK 2 : CREATING AND USING VIEWS
+====================================================*/
+
+-- Step 39
+-- Create student enrollment summary view
+
+create view vw_student_enrollment_summary as
+select
+    s.student_id,
+    concat(s.first_name,' ',s.last_name) as student_name,
+    d.dept_name,
+    count(e.course_id) as total_courses,
+    round(
+        avg(
+            case
+                when e.grade='A' then 4
+                when e.grade='B' then 3
+                when e.grade='C' then 2
+                when e.grade='D' then 1
+                when e.grade='F' then 0
+            end
+        ),2
+    ) as gpa
+from students s
+left join departments d
+on s.department_id=d.department_id
+left join enrollments e
+on s.student_id=e.student_id
+group by s.student_id,d.dept_name;
+
+select * from vw_student_enrollment_summary;
+
+-- Step 40
+-- Create course statistics view
+
+create view vw_course_stats as
+select
+    c.course_name,
+    c.course_code,
+    count(e.enrollment_id) as total_enrollments,
+    round(
+        avg(
+            case
+                when e.grade='A' then 4
+                when e.grade='B' then 3
+                when e.grade='C' then 2
+                when e.grade='D' then 1
+                when e.grade='F' then 0
+            end
+        ),2
+    ) as avg_gpa
+from courses c
+left join enrollments e
+on c.course_id=e.course_id
+group by c.course_id,c.course_name,c.course_code;
+
+select * from vw_course_stats;
+
+-- Step 41
+-- Students with GPA above 3.0
+
+select *
+from vw_student_enrollment_summary
+where gpa > 3.0;
+
+-- Step 42
+-- Attempt to update multi-table view
+
+update vw_student_enrollment_summary
+set gpa = 4
+where student_id = 1;
+
+-- Multi-table aggregated views are generally not updatable
+-- because values are derived from joins and aggregate functions.
+
+-- Step 43
+-- Drop and recreate view with CHECK OPTION
+
+drop view vw_course_stats;
+
+drop view vw_student_enrollment_summary;
+
+create view vw_student_enrollment_summary as
+select
+    student_id,
+    first_name,
+    last_name,
+    enrollment_year
+from students
+where enrollment_year >= 2022
+with check option;
+
+select * from vw_student_enrollment_summary;
+
+/*
+Expected Outcome:
+
+1. vw_student_enrollment_summary created successfully.
+2. vw_course_stats created successfully.
+3. Students with GPA above 3.0 displayed.
+4. Update on aggregated multi-table view is not allowed.
+5. Views dropped and recreated successfully.
+6. WITH CHECK OPTION view created successfully.
+7. SELECT * FROM vw_course_stats returns 5 rows.
+*/
+
+/*====================================================
+  TASK 3 : STORED PROCEDURES AND TRANSACTIONS
+====================================================*/
+
+-- Step 44
+-- Stored Procedure: Enroll Student
+
+delimiter $$
+
+create procedure sp_enroll_student(
+    in p_student_id int,
+    in p_course_id int,
+    in p_enrollment_date date
+)
+begin
+
+    if exists(
+        select 1
+        from enrollments
+        where student_id = p_student_id
+        and course_id = p_course_id
+    )
+    then
+        signal sqlstate '45000'
+        set message_text = 'Duplicate enrollment not allowed';
+    else
+        insert into enrollments
+        (student_id, course_id, enrollment_date)
+        values
+        (p_student_id, p_course_id, p_enrollment_date);
+    end if;
+
+end $$
+
+delimiter ;
+
+-- Test Procedure
+
+call sp_enroll_student(1,3,'2024-01-01');
+
+
+-- Step 45
+-- Create Transfer Log Table
+
+create table department_transfer_log(
+    log_id int auto_increment primary key,
+    student_id int,
+    old_department_id int,
+    new_department_id int,
+    transfer_date timestamp default current_timestamp
+);
+
+-- Procedure to Transfer Student
+
+delimiter $$
+
+create procedure sp_transfer_student(
+    in p_student_id int,
+    in p_new_department_id int
+)
+begin
+
+    declare v_old_department int;
+
+    start transaction;
+
+    select department_id
+    into v_old_department
+    from students
+    where student_id = p_student_id;
+
+    update students
+    set department_id = p_new_department_id
+    where student_id = p_student_id;
+
+    insert into department_transfer_log
+    (
+        student_id,
+        old_department_id,
+        new_department_id
+    )
+    values
+    (
+        p_student_id,
+        v_old_department,
+        p_new_department_id
+    );
+
+    commit;
+
+end $$
+
+delimiter ;
+
+-- Test Procedure
+
+call sp_transfer_student(1,2);
+
+
+-- Step 46
+-- Transaction Rollback Example
+
+start transaction;
+
+update students
+set department_id = 99
+where student_id = 2;
+
+rollback;
+
+select *
+from students
+where student_id = 2;
+
+
+-- Step 47
+-- SAVEPOINT Example
+
+start transaction;
+
+insert into enrollments
+(student_id,course_id,enrollment_date,grade)
+values
+(2,2,'2024-01-01','A');
+
+savepoint sp1;
+
+insert into enrollments
+(student_id,course_id,enrollment_date,grade)
+values
+(999,2,'2024-01-01','A');
+
+rollback to sp1;
+
+commit;
+
+select *
+from enrollments
+where student_id = 2
+and course_id = 2;
+
+
+/*
+Expected Outcome:
+
+1. sp_enroll_student inserts a new enrollment.
+2. Duplicate enrollments raise an error message.
+3. sp_transfer_student updates department and logs the transfer.
+4. Transaction rollback restores original data when an error occurs.
+5. SAVEPOINT allows partial rollback.
+6. First enrollment insert remains after rollback to SAVEPOINT.
+7. Data integrity is maintained using transactions.
+*/

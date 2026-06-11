@@ -1,0 +1,258 @@
+/*====================================================
+  HANDS-ON 2
+  TASK 1 : INSERT, UPDATE AND DELETE DATA
+====================================================*/
+
+-- Step 15
+-- Sample data from the Common Schema section was inserted.
+
+-- Verify existing data
+select count(*) from students;
+select count(*) from departments;
+select count(*) from courses;
+select count(*) from enrollments;
+select count(*) from professors;
+
+-- Step 16
+-- Insert two additional students
+
+insert into students
+(first_name, last_name, email, date_of_birth, department_id, enrollment_year)
+values
+('Rahul', 'Sharma', 'rahul.sharma@college.edu', '2003-06-15', 1, 2022),
+('Neha', 'Iyer', 'neha.iyer@college.edu', '2004-02-10', 2, 2023);
+
+-- Verify student count
+select count(*) from students;
+
+-- Step 17
+-- Update grade of student_id = 5 and course_id = 1
+
+update enrollments
+set grade = 'B'
+where student_id = 5
+and course_id = 1;
+
+-- Verify update
+select *
+from enrollments
+where student_id = 5
+and course_id = 1;
+
+-- Step 18
+-- Preview rows before deletion
+
+select *
+from enrollments
+where grade is null;
+
+-- Delete rows with NULL grades
+
+delete from enrollments
+where grade is null;
+
+-- Verify deletion
+
+select *
+from enrollments
+where grade is null;
+
+-- Step 19
+-- Verify row counts
+
+select count(*) as total_students
+from students;
+
+select count(*) as total_enrollments
+from enrollments;
+
+/*
+Expected Outcome:
+
+1. Sample data inserted successfully.
+2. Two additional students inserted.
+3. Total students = 10.
+4. Grade for student_id = 5 and course_id = 1 updated from 'C' to 'B'.
+5. Enrollments with NULL grades removed.
+6. Enrollments table contains only non-NULL grades.
+7. Row counts verified using COUNT(*).
+
+Expected Results:
+students = 10
+enrollments = 10
+*/
+
+
+/*====================================================
+  TASK 2 : SINGLE-TABLE QUERIES AND FILTERING
+====================================================*/
+
+-- Step 20
+-- Retrieve all students enrolled in 2022 ordered by last_name
+
+select *
+from students
+where enrollment_year = 2022
+order by last_name;
+
+-- Step 21
+-- Find courses with more than 3 credits
+
+select *
+from courses
+where credits > 3
+order by credits desc;
+
+-- Step 22
+-- List professors with salary between 80000 and 95000
+
+select *
+from professors
+where salary between 80000 and 95000;
+
+-- Step 23
+-- Find students whose email ends with @college.edu
+
+select *
+from students
+where email like '%@college.edu';
+
+-- Step 24
+-- Count students per enrollment year
+
+select enrollment_year,
+       count(*) as total_students
+from students
+group by enrollment_year;
+
+/*
+Expected Outcome:
+
+1. Students enrolled in 2022 displayed in alphabetical order of last_name.
+2. Courses having credits greater than 3 displayed.
+3. Professors with salary between 80000 and 95000 displayed.
+4. All students with email ending in @college.edu displayed.
+5. Student count shown for each enrollment_year.
+
+Expected Result for Query 5:
+
+enrollment_year | total_students
+--------------------------------
+2021            | 2
+2022            | 6
+2023            | 2
+
+(After inserting Rahul and Neha)
+*/
+
+
+/*====================================================
+  TASK 3 : MULTI-TABLE JOINS
+====================================================*/
+
+-- Step 25
+-- Student full name with department name
+
+select concat(s.first_name,' ',s.last_name) as student_name,
+       d.dept_name
+from students s
+inner join departments d
+on s.department_id = d.department_id;
+
+-- Step 26
+-- Enrollment details with student name and course name
+
+select e.enrollment_id,
+       concat(s.first_name,' ',s.last_name) as student_name,
+       c.course_name,
+       e.grade
+from enrollments e
+inner join students s
+on e.student_id = s.student_id
+inner join courses c
+on e.course_id = c.course_id;
+
+-- Step 27
+-- Students not enrolled in any course
+
+select s.student_id,
+       concat(s.first_name,' ',s.last_name) as student_name
+from students s
+left join enrollments e
+on s.student_id = e.student_id
+where e.student_id is null;
+
+-- Step 28
+-- Every course with number of enrolled students
+
+select c.course_name,
+       count(e.student_id) as enrollment_count
+from courses c
+left join enrollments e
+on c.course_id = e.course_id
+group by c.course_id,c.course_name;
+
+-- Step 29
+-- Department with professors and salaries
+
+select d.dept_name,
+       p.prof_name,
+       p.salary
+from departments d
+left join professors p
+on d.department_id = p.department_id;
+
+
+/*====================================================
+  TASK 4 : AGGREGATIONS AND GROUPING
+====================================================*/
+
+-- Step 30
+-- Total number of enrollments per course
+
+select c.course_name,
+       count(e.enrollment_id) as enrollment_count
+from courses c
+left join enrollments e
+on c.course_id = e.course_id
+group by c.course_id, c.course_name;
+
+-- Step 31
+-- Average salary of professors per department
+
+select d.dept_name,
+       round(avg(p.salary),2) as avg_salary
+from departments d
+left join professors p
+on d.department_id = p.department_id
+group by d.department_id, d.dept_name;
+
+-- Step 32
+-- Departments with budget greater than 600000
+
+select dept_name,
+       budget
+from departments
+where budget > 600000;
+
+-- Step 33
+-- Grade distribution for course CS101
+
+select e.grade,
+       count(*) as grade_count
+from enrollments e
+inner join courses c
+on e.course_id = c.course_id
+where c.course_code = 'CS101'
+group by e.grade;
+
+-- Step 34
+-- Departments with more than 2 students
+
+select d.dept_name,
+       count(s.student_id) as student_count
+from departments d
+inner join students s
+on d.department_id = s.department_id
+group by d.department_id, d.dept_name
+having count(s.student_id) > 2;

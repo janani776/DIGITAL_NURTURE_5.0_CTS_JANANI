@@ -1,0 +1,35 @@
+// Task 1
+
+use("college_nosql")
+
+db.createCollection("feedback")
+
+db.feedback.insertMany([
+{
+ student_id:1,
+ course_code:"CS101",
+ rating:5
+}
+])
+
+db.feedback.countDocuments()
+
+// Task 2
+
+db.feedback.find({rating:5})
+
+db.feedback.updateMany(
+ {rating:{$lt:3}},
+ {$set:{needs_review:true}}
+)
+
+// Task 3
+
+db.feedback.aggregate([
+ {
+   $group:{
+      _id:"$course_code",
+      avg_rating:{$avg:"$rating"}
+   }
+ }
+])
