@@ -1,0 +1,35 @@
+.form-container{
+
+  padding:30px;
+
+}
+
+form{
+
+  display:flex;
+
+  flex-direction:column;
+
+  gap:15px;
+
+  width:300px;
+
+}
+
+input{
+
+  padding:10px;
+
+}
+
+button{
+
+  padding:10px;
+
+  background-color:#2563eb;
+
+  color:white;
+
+  border:none;
+
+}
